@@ -1,0 +1,70 @@
+{
+  "name": "mioku-plugin-deerpipe",
+  "version": "1.0.0",
+  "description": "🦌管签到插件，支持自🦌、帮🦌、补🦌、🦌历、🦌榜",
+  "main": "index.ts",
+  "type": "module",
+  "keywords": [
+    "mioku"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mioku-lab/mioku.git"
+  },
+  "mioku": {
+    "services": [
+      "screenshot",
+      "help"
+    ],
+    "help": {
+      "title": "🦌管签到",
+      "description": "每月🦌管签到，含日历与排行榜",
+      "commands": [
+        {
+          "cmd": "🦌",
+          "desc": "签到一次（可加 @某人 帮其签到）",
+          "usage": "🦌 / 🦌 @张三",
+          "role": "member"
+        },
+        {
+          "cmd": "补🦌 <日>",
+          "desc": "补签本月之前未签到的某天",
+          "usage": "补🦌 5",
+          "role": "member"
+        },
+        {
+          "cmd": "🦌历",
+          "desc": "查看本月🦌签到日历（可加 @某人）",
+          "usage": "🦌历 / 🦌历 @张三",
+          "role": "member"
+        },
+        {
+          "cmd": "🦌榜",
+          "desc": "查看本月本群🦌签到排行榜（仅群组）",
+          "usage": "🦌榜",
+          "role": "member"
+        },
+        {
+          "cmd": "帮🦌 <on|off> [@某人]",
+          "desc": "允许/禁止被别人帮🦌；@某人需管理员",
+          "usage": "帮🦌 off",
+          "role": "member"
+        },
+        {
+          "cmd": "禁🦌 @某人 [时长]",
+          "desc": "禁止某人在一段时间内🦌，省略时长视为解禁（仅管理员）",
+          "usage": "禁🦌 @张三 1d",
+          "role": "admin"
+        }
+      ]
+    }
+  },
+  "peerDependencies": {
+    "mioku": "^0.8.0",
+    "mioki": "^0.16.0"
+  },
+  "devDependencies": {
+    "mioku": "workspace:*",
+    "mioki": "^0.16.0"
+  }
+}
