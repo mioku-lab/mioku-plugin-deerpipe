@@ -65,17 +65,36 @@ interface AssetUris {
 
 let assetsCache: AssetUris | null = null;
 
+const TRANSPARENT_PNG =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=";
+
 async function loadAssets(): Promise<AssetUris> {
   if (assetsCache) return assetsCache;
   const here = path.dirname(fileURLToPath(import.meta.url));
   const assetsDir = path.join(here, "assets");
+
+  async function readOptional(name: string): Promise<Buffer | null> {
+    try {
+      return await fs.readFile(path.join(assetsDir, name));
+    } catch {
+      return null;
+    }
+  }
+
   const [avatar, check, deerpipe] = await Promise.all([
-    fs.readFile(path.join(assetsDir, "akkarin@80x80.png")),
-    fs.readFile(path.join(assetsDir, "check@96x100.png")),
-    fs.readFile(path.join(assetsDir, "deerpipe@100x82.png")),
+    readOptional("akkarin@80x80.png"),
+    readOptional("check@96x100.png"),
+    readOptional("deerpipe@100x82.png"),
   ]);
+  if (!check || !deerpipe) {
+    throw new Error(
+      "deerpipe 必需素材缺失:check@96x100.png / deerpipe@100x82.png",
+    );
+  }
   assetsCache = {
-    defaultAvatar: `data:image/png;base64,${avatar.toString("base64")}`,
+    defaultAvatar: avatar
+      ? `data:image/png;base64,${avatar.toString("base64")}`
+      : TRANSPARENT_PNG,
     check: `data:image/png;base64,${check.toString("base64")}`,
     deerpipe: `data:image/png;base64,${deerpipe.toString("base64")}`,
   };
