@@ -1,33 +1,21 @@
-import { createDB } from "mioki";
-import { ensureDataDir } from "mioku";
+import { Database } from "bun:sqlite";
 import * as path from "path";
+import { ensureDataDir } from "mioku";
 import type {
   DeerCheckInResult,
   DeerRankEntry,
   DeerUser,
 } from "./types";
 
-interface UserRecord {
-  canBeHelped: boolean;
-  noDeerUntil: number | null;
+interface UserRow {
+  can_be_helped: number;
+  no_deer_until: number | null;
 }
 
-/**
- * users:   key = "<scene>:<userId>"
- * records: scene -> "yyyy-mm" -> userId -> day -> count
- */
-interface DeerStore {
-  users: Record<string, UserRecord>;
-  records: Record<
-    string,
-    Record<string, Record<string, Record<string, number>>>
-  >;
+interface RecordRow {
+  day: number;
+  count: number;
 }
-
-const DEFAULT_STORE: DeerStore = {
-  users: {},
-  records: {},
-};
 
 export interface DeerDatabase {
   getOrCreateUser(scene: string, userId: number): DeerUser;
@@ -53,6 +41,7 @@ export interface DeerDatabase {
     limit: number,
   ): DeerRankEntry[];
   cleanupOtherMonths(year: number, month: number): Promise<void>;
+  close(): void;
 }
 
 function userKey(scene: string, userId: number): string {
@@ -65,38 +54,74 @@ function monthKey(year: number, month: number): string {
 
 export async function initDeerDatabase(): Promise<DeerDatabase> {
   const dir = ensureDataDir("deerpipe");
-  const file = path.join(dir, "deerpipe.json");
-  const db = await createDB<DeerStore>(file, {
-    defaultData: structuredClone(DEFAULT_STORE),
-  });
+  const dbPath = path.join(dir, "deerpipe.db");
+  const db = new Database(dbPath);
 
-  // Defensive: createDB merges with defaultData but keys may have been
-  // dropped from a hand-edited file.
-  if (!db.data.users) db.data.users = {};
-  if (!db.data.records) db.data.records = {};
+  db.exec("PRAGMA journal_mode = WAL");
 
-  function readUserRecord(scene: string, userId: number): UserRecord {
-    const key = userKey(scene, userId);
-    let row = db.data.users[key];
-    if (!row) {
-      row = { canBeHelped: true, noDeerUntil: null };
-      db.data.users[key] = row;
-    }
-    return row;
-  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      key TEXT PRIMARY KEY,
+      can_be_helped INTEGER NOT NULL DEFAULT 1,
+      no_deer_until INTEGER
+    );
 
-  function readMonthRecords(
-    scene: string,
-    userId: number,
-    year: number,
-    month: number,
-  ): Record<string, number> {
-    const sceneRecords = db.data.records[scene];
-    if (!sceneRecords) return {};
-    const monthRecords = sceneRecords[monthKey(year, month)];
-    if (!monthRecords) return {};
-    return monthRecords[String(userId)] ?? {};
-  }
+    CREATE TABLE IF NOT EXISTS records (
+      scene TEXT NOT NULL,
+      month_key TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (scene, month_key, user_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS idx_records_scene_month
+      ON records(scene, month_key);
+  `);
+
+  const stmts = {
+    getUser: db.prepare(
+      `SELECT can_be_helped, no_deer_until FROM users WHERE key = $key`,
+    ),
+    insertUser: db.prepare(`
+      INSERT INTO users (key, can_be_helped, no_deer_until)
+      VALUES ($key, 1, NULL)
+      ON CONFLICT(key) DO NOTHING
+    `),
+    updateUser: db.prepare(`
+      INSERT INTO users (key, can_be_helped, no_deer_until)
+      VALUES ($key, $canBeHelped, $noDeerUntil)
+      ON CONFLICT(key) DO UPDATE SET
+        can_be_helped = $canBeHelped,
+        no_deer_until = $noDeerUntil
+    `),
+    getMonthRecords: db.prepare(`
+      SELECT day, count FROM records
+      WHERE scene = $scene AND month_key = $monthKey AND user_id = $userId
+      ORDER BY day ASC
+    `),
+    getDayRecord: db.prepare(`
+      SELECT count FROM records
+      WHERE scene = $scene AND month_key = $monthKey AND user_id = $userId AND day = $day
+    `),
+    insertRecord: db.prepare(`
+      INSERT INTO records (scene, month_key, user_id, day, count)
+      VALUES ($scene, $monthKey, $userId, $day, 1)
+    `),
+    incrementRecord: db.prepare(`
+      UPDATE records SET count = count + 1
+      WHERE scene = $scene AND month_key = $monthKey AND user_id = $userId AND day = $day
+    `),
+    getMonthRank: db.prepare(`
+      SELECT user_id, SUM(count) AS total FROM records
+      WHERE scene = $scene AND month_key = $monthKey
+      GROUP BY user_id
+      ORDER BY total DESC
+      LIMIT $limit
+    `),
+    deleteOtherMonths: db.prepare(
+      `DELETE FROM records WHERE month_key != $keepKey`,
+    ),
+  };
 
   function loadRecords(
     scene: string,
@@ -104,30 +129,40 @@ export async function initDeerDatabase(): Promise<DeerDatabase> {
     year: number,
     month: number,
   ): Map<number, number> {
-    const raw = readMonthRecords(scene, userId, year, month);
+    const rows = stmts.getMonthRecords.all({
+      $scene: scene,
+      $monthKey: monthKey(year, month),
+      $userId: userId,
+    }) as RecordRow[];
     const map = new Map<number, number>();
-    for (const [k, v] of Object.entries(raw)) {
-      map.set(Number(k), Number(v));
+    for (const row of rows) {
+      map.set(row.day, row.count);
     }
     return map;
   }
 
   return {
     getOrCreateUser(scene, userId) {
-      const row = readUserRecord(scene, userId);
+      const key = userKey(scene, userId);
+      let row = stmts.getUser.get({ $key: key }) as UserRow | null;
+      if (!row) {
+        stmts.insertUser.run({ $key: key });
+        row = { can_be_helped: 1, no_deer_until: null };
+      }
       return {
         scene,
         userId,
-        canBeHelped: row.canBeHelped,
-        noDeerUntil: row.noDeerUntil,
+        canBeHelped: Boolean(row.can_be_helped),
+        noDeerUntil: row.no_deer_until,
       };
     },
 
     async updateUser(user) {
-      const row = readUserRecord(user.scene, user.userId);
-      row.canBeHelped = user.canBeHelped;
-      row.noDeerUntil = user.noDeerUntil;
-      await db.write();
+      stmts.updateUser.run({
+        $key: userKey(user.scene, user.userId),
+        $canBeHelped: user.canBeHelped ? 1 : 0,
+        $noDeerUntil: user.noDeerUntil,
+      });
     },
 
     getRecords(scene, userId, year, month) {
@@ -135,25 +170,39 @@ export async function initDeerDatabase(): Promise<DeerDatabase> {
     },
 
     async checkIn(scene, userId, year, month, day, isPast) {
-      readUserRecord(scene, userId);
-      const sceneRecords = (db.data.records[scene] ??= {});
-      const monthRecords = (sceneRecords[monthKey(year, month)] ??= {});
-      const userRecords = (monthRecords[String(userId)] ??= {});
+      stmts.insertUser.run({ $key: userKey(scene, userId) });
 
-      const dayKey = String(day);
-      if (userRecords[dayKey] != null) {
-        if (isPast) {
-          return {
-            ok: false,
-            records: loadRecords(scene, userId, year, month),
-          };
-        }
-        userRecords[dayKey] = Number(userRecords[dayKey]) + 1;
-      } else {
-        userRecords[dayKey] = 1;
+      const mKey = monthKey(year, month);
+      const existing = stmts.getDayRecord.get({
+        $scene: scene,
+        $monthKey: mKey,
+        $userId: userId,
+        $day: day,
+      }) as { count: number } | null;
+
+      if (existing && isPast) {
+        return {
+          ok: false,
+          records: loadRecords(scene, userId, year, month),
+        };
       }
 
-      await db.write();
+      if (existing) {
+        stmts.incrementRecord.run({
+          $scene: scene,
+          $monthKey: mKey,
+          $userId: userId,
+          $day: day,
+        });
+      } else {
+        stmts.insertRecord.run({
+          $scene: scene,
+          $monthKey: mKey,
+          $userId: userId,
+          $day: day,
+        });
+      }
+
       return {
         ok: true,
         records: loadRecords(scene, userId, year, month),
@@ -161,36 +210,23 @@ export async function initDeerDatabase(): Promise<DeerDatabase> {
     },
 
     getRank(scene, year, month, limit) {
-      const monthRecords = db.data.records[scene]?.[monthKey(year, month)];
-      if (!monthRecords) return [];
-      const totals: DeerRankEntry[] = [];
-      for (const [uid, days] of Object.entries(monthRecords)) {
-        let total = 0;
-        for (const v of Object.values(days)) total += Number(v);
-        if (total > 0) {
-          totals.push({ userId: Number(uid), count: total });
-        }
-      }
-      totals.sort((a, b) => b.count - a.count);
-      return totals.slice(0, limit);
+      const rows = stmts.getMonthRank.all({
+        $scene: scene,
+        $monthKey: monthKey(year, month),
+        $limit: limit,
+      }) as Array<{ user_id: number; total: number }>;
+      return rows.map((row) => ({
+        userId: row.user_id,
+        count: row.total,
+      }));
     },
 
     async cleanupOtherMonths(year, month) {
-      const keepKey = monthKey(year, month);
-      let dirty = false;
-      for (const [scene, sceneRecords] of Object.entries(db.data.records)) {
-        for (const k of Object.keys(sceneRecords)) {
-          if (k !== keepKey) {
-            delete sceneRecords[k];
-            dirty = true;
-          }
-        }
-        if (Object.keys(sceneRecords).length === 0) {
-          delete db.data.records[scene];
-          dirty = true;
-        }
-      }
-      if (dirty) await db.write();
+      stmts.deleteOtherMonths.run({ $keepKey: monthKey(year, month) });
+    },
+
+    close() {
+      db.close();
     },
   };
 }
