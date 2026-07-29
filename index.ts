@@ -1,5 +1,5 @@
-import type { ScreenshotService } from "mioku";
 import { definePlugin, type MiokiContext } from "mioki";
+import { getService, Services } from "mioku";
 import { initDeerDatabase, type DeerDatabase } from "./db";
 import { handleDeerCommand, parseDeerCommand } from "./commands";
 
@@ -11,9 +11,7 @@ const deerpipePlugin = definePlugin({
   async setup(ctx: MiokiContext) {
     ctx.logger.info("deerpipe 插件正在初始化...");
 
-    const screenshotService = ctx.services?.screenshot as
-      | ScreenshotService
-      | undefined;
+    const screenshotService = getService(ctx, Services.Screenshot);
 
     if (!screenshotService) {
       ctx.logger.warn("screenshot 服务未加载，deerpipe 插件无法生成图片");
