@@ -49,7 +49,7 @@ const deerpipePlugin = definePlugin({
       }
     });
 
-    ctx.handle("message", async (event: any) => {
+    ctx.handle("message", async (event) => {
       const text = ctx.text(event);
       if (!text) return;
 
