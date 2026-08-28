@@ -1,4 +1,4 @@
-import type { MiokiContext } from "mioki";
+import { createGroupRef, friendGetInfo, type MiokuContext } from "mioku";
 import * as fs from "fs/promises";
 import type { DeerScene } from "./types";
 
@@ -34,16 +34,14 @@ export function resolveScene(event: any): DeerScene {
 }
 
 export async function resolveUserName(
-  ctx: MiokiContext,
+  ctx: MiokuContext,
   event: any,
   userId: number,
 ): Promise<string> {
-  const selfId = Number(event?.self_id);
-  if (event?.message_type === "group" && event?.group_id != null) {
+  const bot = ctx.pickBot(String(event?.self_id));
+  if (event?.message_type === "group" && event?.group_id != null && bot) {
     try {
-      const member = await ctx
-        .pickBot(selfId)
-        .getGroupMemberInfo(Number(event.group_id), userId);
+      const member = await createGroupRef(bot, String(event.group_id)).getMemberInfo(String(userId));
       const name =
         String(member?.card || "").trim() ||
         String(member?.nickname || "").trim();
@@ -59,11 +57,9 @@ export async function resolveUserName(
     if (name) return name;
   }
   try {
-    const stranger = (await ctx
-      .pickBot(selfId)
-      .api("get_stranger_info", { user_id: userId })) as
-      | { nickname?: string }
-      | undefined;
+    const stranger = bot
+      ? await bot.invoke(friendGetInfo, { user_id: String(userId) })
+      : undefined;
     const name = String(stranger?.nickname || "").trim();
     if (name) return name;
   } catch {

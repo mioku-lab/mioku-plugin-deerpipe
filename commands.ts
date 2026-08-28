@@ -1,5 +1,5 @@
 import type { ScreenshotService } from "mioku";
-import type { MiokiContext } from "mioki";
+import type { MiokuContext } from "mioku";
 import type { DeerDatabase } from "./db";
 import { generateCalendarImage, generateRankImage } from "./image";
 import {
@@ -14,7 +14,7 @@ import {
 const MAX_NO_DEER_DURATION_S = 30 * 86400;
 
 interface CommandContext {
-  ctx: MiokiContext;
+  ctx: MiokuContext;
   db: DeerDatabase;
   screenshot: ScreenshotService;
   event: any;
@@ -176,7 +176,7 @@ async function handleDeer(
   });
 
   const prefix = targetUserId
-    ? [{ type: "text", data: { text: "成功帮 " } }, ctx.segment.at(targetUserId), { type: "text", data: { text: " 🦌了\n" } }]
+    ? [{ type: "text", data: { text: "成功帮 " } }, ctx.segment.at(String(targetUserId)), { type: "text", data: { text: " 🦌了\n" } }]
     : [{ type: "text", data: { text: "成功🦌了\n" } }];
 
   await replyImage(event, ctx.segment, imagePath, prefix);
@@ -312,7 +312,7 @@ async function handleSetCanBeHelped(
     await event.reply(
       [
         { type: "text", data: { text: `已${allowed ? "允许" : "禁止"}帮 ` } },
-        ctx.segment.at(targetUserId),
+        ctx.segment.at(String(targetUserId)),
         { type: "text", data: { text: " 🦌" } },
       ],
       true,
@@ -361,7 +361,7 @@ async function handleSetNoDeer(
     await event.reply(
       [
         { type: "text", data: { text: "已解禁 " } },
-        ctx.segment.at(targetUserId),
+        ctx.segment.at(String(targetUserId)),
         { type: "text", data: { text: " 的🦌权" } },
       ],
       true,
@@ -370,7 +370,7 @@ async function handleSetNoDeer(
     await event.reply(
       [
         { type: "text", data: { text: "已禁止 " } },
-        ctx.segment.at(targetUserId),
+        ctx.segment.at(String(targetUserId)),
         {
           type: "text",
           data: {

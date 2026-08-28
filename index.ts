@@ -1,4 +1,4 @@
-import { definePlugin, type MiokiContext } from "mioki";
+import { definePlugin, type MiokuContext } from "mioku";
 import { getService, Services } from "mioku";
 import { initDeerDatabase, type DeerDatabase } from "./db";
 import { handleDeerCommand, parseDeerCommand } from "./commands";
@@ -8,7 +8,7 @@ const deerpipePlugin = definePlugin({
   version: "1.0.0",
   description: "🦌管签到插件，支持自🦌、帮🦌、补🦌、🦌历、🦌榜",
 
-  async setup(ctx: MiokiContext) {
+  async setup(ctx: MiokuContext) {
     ctx.logger.info("deerpipe 插件正在初始化...");
 
     const screenshotService = getService(ctx, Services.Screenshot);
@@ -53,7 +53,7 @@ const deerpipePlugin = definePlugin({
       const text = ctx.text(event);
       if (!text) return;
 
-      const cmd = parseDeerCommand(text, event.message ?? []);
+      const cmd = parseDeerCommand(text, Array.from(event.message ?? []));
       if (cmd.type === "none") return;
 
       try {
