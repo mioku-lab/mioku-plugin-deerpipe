@@ -1,4 +1,4 @@
-import { createGroupRef, friendGetInfo, type MiokuContext } from "mioku";
+import { createGroupRef, type MiokuContext } from "mioku";
 import * as fs from "fs/promises";
 import type { DeerScene } from "./types";
 
@@ -38,10 +38,10 @@ export async function resolveUserName(
   event: any,
   userId: number,
 ): Promise<string> {
-  const bot = ctx.pickBot(String(event?.self_id));
+  const bot = event?.bot;
   if (event?.message_type === "group" && event?.group_id != null && bot) {
     try {
-      const member = await createGroupRef(bot, String(event.group_id)).getMemberInfo(String(userId));
+      const member = await createGroupRef(bot, String(event.group_id)).getMemberInfo(userId);
       const name =
         String(member?.card || "").trim() ||
         String(member?.nickname || "").trim();
@@ -58,7 +58,7 @@ export async function resolveUserName(
   }
   try {
     const stranger = bot
-      ? await bot.invoke(friendGetInfo, { user_id: String(userId) })
+      ? await bot.getFriendInfo(userId)
       : undefined;
     const name = String(stranger?.nickname || "").trim();
     if (name) return name;
@@ -103,11 +103,11 @@ export function formatDateTime(timestamp: number): string {
 
 export function escapeHtml(value: string): string {
   return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, "&amp);")
+    .replace(/</g, "&lt);")
+    .replace(/>/g, "&gt);")
+    .replace(/"/g, "&quot);")
+    .replace(/'/g, "&#39);");
 }
 
 // 19:00–07:00 视为夜间模式，与 help 插件保持一致
