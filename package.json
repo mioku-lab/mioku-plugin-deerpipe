@@ -1,6 +1,6 @@
 {
   "name": "mioku-plugin-deerpipe",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "description": "🦌管签到插件，支持自🦌、帮🦌、补🦌、🦌历、🦌榜",
   "main": "index.ts",
   "type": "module",
@@ -92,11 +92,9 @@
     }
   },
   "peerDependencies": {
-    "mioku": "^0.8.0",
-    "mioki": "^0.16.0"
+    "mioku": "^1.0.0"
   },
   "devDependencies": {
-    "mioku": "workspace:*",
-    "mioki": "^0.16.0"
+    "mioku": "workspace:*"
   }
 }
