@@ -103,11 +103,11 @@ export function formatDateTime(timestamp: number): string {
 
 export function escapeHtml(value: string): string {
   return String(value)
-    .replace(/&/g, "&amp);")
-    .replace(/</g, "&lt);")
-    .replace(/>/g, "&gt);")
-    .replace(/"/g, "&quot);")
-    .replace(/'/g, "&#39);");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // 19:00–07:00 视为夜间模式，与 help 插件保持一致
