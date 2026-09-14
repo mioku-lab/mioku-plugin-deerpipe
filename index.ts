@@ -5,8 +5,6 @@ import { handleDeerCommand, parseDeerCommand } from "./commands";
 
 const deerpipePlugin = definePlugin({
   name: "deerpipe",
-  version: "1.0.0",
-  description: "🦌管签到插件，支持自🦌、帮🦌、补🦌、🦌历、🦌榜",
 
   async setup(ctx: MiokuContext) {
     ctx.logger.info("deerpipe 插件正在初始化...");
