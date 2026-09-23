@@ -7,6 +7,7 @@ import {
   getAtUserId,
   parseDuration,
   replyImage,
+  resolveAvatarUrl,
   resolveScene,
   resolveUserName,
 } from "./utils";
@@ -30,12 +31,12 @@ function isGroupAdmin(event: any): boolean {
 }
 
 export type DeerCommand =
-  | { type: "deer"; targetUserId?: number }
+  | { type: "deer"; targetUserId?: string }
   | { type: "past"; day: number }
-  | { type: "calendar"; targetUserId?: number }
+  | { type: "calendar"; targetUserId?: string }
   | { type: "rank" }
-  | { type: "set_can_be_helped"; allowed: boolean; targetUserId?: number }
-  | { type: "set_no_deer"; targetUserId: number; durationText?: string }
+  | { type: "set_can_be_helped"; allowed: boolean; targetUserId?: string }
+  | { type: "set_no_deer"; targetUserId: string; durationText?: string }
   | { type: "invalid_past" }
   | { type: "none" };
 
@@ -124,7 +125,7 @@ export async function handleDeerCommand(
 
 async function handleDeer(
   cmdCtx: CommandContext,
-  targetUserId?: number,
+  targetUserId?: string,
 ): Promise<void> {
   const { ctx, db, screenshot, event } = cmdCtx;
   const scene = resolveScene(event);
@@ -136,7 +137,7 @@ async function handleDeer(
   }
 
   const userId =
-    targetUserId != null ? targetUserId : Number(event.user_id);
+    targetUserId != null ? targetUserId : String(event.user_id ?? "").trim();
   const user = db.getOrCreateUser(scene.key, userId);
 
   if (targetUserId && !user.canBeHelped) {
@@ -173,10 +174,11 @@ async function handleDeer(
     records: result.records,
     name,
     userId,
+    avatar: resolveAvatarUrl(event, userId),
   });
 
   const prefix = targetUserId
-    ? [{ type: "text", data: { text: "成功帮 " } }, ctx.segment.at(String(targetUserId)), { type: "text", data: { text: " 🦌了\n" } }]
+    ? [{ type: "text", data: { text: "成功帮 " } }, ctx.segment.at(targetUserId), { type: "text", data: { text: " 🦌了\n" } }]
     : [{ type: "text", data: { text: "成功🦌了\n" } }];
 
   await replyImage(event, ctx.segment, imagePath, prefix);
@@ -195,7 +197,7 @@ async function handlePast(
     return;
   }
 
-  const userId = Number(event.user_id);
+  const userId = String(event.user_id ?? "").trim();
   db.getOrCreateUser(scene.key, userId);
 
   const result = await db.checkIn(
@@ -215,6 +217,7 @@ async function handlePast(
     records: result.records,
     name,
     userId,
+    avatar: resolveAvatarUrl(event, userId),
   });
 
   const text = result.ok ? "成功补🦌\n" : "不能补🦌已经🦌过的日子捏\n";
@@ -228,14 +231,14 @@ async function handlePast(
 
 async function handleCalendar(
   cmdCtx: CommandContext,
-  targetUserId?: number,
+  targetUserId?: string,
 ): Promise<void> {
   const { ctx, db, screenshot, event } = cmdCtx;
   const scene = resolveScene(event);
   if (targetUserId && !scene.isGroup) return;
 
   const now = new Date();
-  const userId = targetUserId ?? Number(event.user_id);
+  const userId = targetUserId ?? String(event.user_id ?? "").trim();
   db.getOrCreateUser(scene.key, userId);
   const records = db.getRecords(
     scene.key,
@@ -252,6 +255,7 @@ async function handleCalendar(
     records,
     name,
     userId,
+    avatar: resolveAvatarUrl(event, userId),
   });
 
   await replyImage(event, ctx.segment, imagePath);
@@ -275,6 +279,7 @@ async function handleRank(cmdCtx: CommandContext): Promise<void> {
       rank: idx + 1,
       userId: entry.userId,
       name: await resolveUserName(ctx, event, entry.userId),
+      avatar: resolveAvatarUrl(event, entry.userId),
       count: entry.count,
     })),
   );
@@ -292,7 +297,7 @@ async function handleRank(cmdCtx: CommandContext): Promise<void> {
 async function handleSetCanBeHelped(
   cmdCtx: CommandContext,
   allowed: boolean,
-  targetUserId?: number,
+  targetUserId?: string,
 ): Promise<void> {
   const { ctx, db, event } = cmdCtx;
   const scene = resolveScene(event);
@@ -303,7 +308,7 @@ async function handleSetCanBeHelped(
     return;
   }
 
-  const userId = targetUserId ?? Number(event.user_id);
+  const userId = targetUserId ?? String(event.user_id ?? "").trim();
   const user = db.getOrCreateUser(scene.key, userId);
   user.canBeHelped = allowed;
   await db.updateUser(user);
@@ -312,7 +317,7 @@ async function handleSetCanBeHelped(
     await event.reply(
       [
         { type: "text", data: { text: `已${allowed ? "允许" : "禁止"}帮 ` } },
-        ctx.segment.at(String(targetUserId)),
+        ctx.segment.at(targetUserId),
         { type: "text", data: { text: " 🦌" } },
       ],
       true,
@@ -324,7 +329,7 @@ async function handleSetCanBeHelped(
 
 async function handleSetNoDeer(
   cmdCtx: CommandContext,
-  targetUserId: number,
+  targetUserId: string,
   durationText?: string,
 ): Promise<void> {
   const { ctx, db, event } = cmdCtx;
@@ -361,7 +366,7 @@ async function handleSetNoDeer(
     await event.reply(
       [
         { type: "text", data: { text: "已解禁 " } },
-        ctx.segment.at(String(targetUserId)),
+        ctx.segment.at(targetUserId),
         { type: "text", data: { text: " 的🦌权" } },
       ],
       true,
@@ -370,7 +375,7 @@ async function handleSetNoDeer(
     await event.reply(
       [
         { type: "text", data: { text: "已禁止 " } },
-        ctx.segment.at(String(targetUserId)),
+        ctx.segment.at(targetUserId),
         {
           type: "text",
           data: {

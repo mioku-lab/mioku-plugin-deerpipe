@@ -18,17 +18,17 @@ interface RecordRow {
 }
 
 export interface DeerDatabase {
-  getOrCreateUser(scene: string, userId: number): DeerUser;
+  getOrCreateUser(scene: string, userId: string): DeerUser;
   updateUser(user: DeerUser): Promise<void>;
   getRecords(
     scene: string,
-    userId: number,
+    userId: string,
     year: number,
     month: number,
   ): Map<number, number>;
   checkIn(
     scene: string,
-    userId: number,
+    userId: string,
     year: number,
     month: number,
     day: number,
@@ -44,7 +44,7 @@ export interface DeerDatabase {
   close(): void;
 }
 
-function userKey(scene: string, userId: number): string {
+function userKey(scene: string, userId: string): string {
   return `${scene}:${userId}`;
 }
 
@@ -125,7 +125,7 @@ export async function initDeerDatabase(): Promise<DeerDatabase> {
 
   function loadRecords(
     scene: string,
-    userId: number,
+    userId: string,
     year: number,
     month: number,
   ): Map<number, number> {
@@ -214,9 +214,9 @@ export async function initDeerDatabase(): Promise<DeerDatabase> {
         $scene: scene,
         $monthKey: monthKey(year, month),
         $limit: limit,
-      }) as Array<{ user_id: number; total: number }>;
+      }) as Array<{ user_id: string; total: number }>;
       return rows.map((row) => ({
-        userId: row.user_id,
+        userId: String(row.user_id),
         count: row.total,
       }));
     },

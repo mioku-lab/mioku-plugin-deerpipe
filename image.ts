@@ -2,7 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import type { ScreenshotService } from "mioku";
-import { escapeHtml, getAvatarUrl, isNightMode } from "./utils";
+import { escapeHtml, isNightMode } from "./utils";
 
 interface CalendarOptions {
   year: number;
@@ -10,13 +10,15 @@ interface CalendarOptions {
   todayDay: number;
   records: Map<number, number>;
   name: string;
-  userId: number;
+  userId: string;
+  avatar?: string;
 }
 
 interface RankRow {
   rank: number;
   name: string;
-  userId: number;
+  userId: string;
+  avatar?: string;
   count: number;
 }
 
@@ -127,7 +129,7 @@ export async function generateCalendarImage(
   screenshotService: ScreenshotService,
   options: CalendarOptions,
 ): Promise<string> {
-  const { year, month, records, name, userId } = options;
+  const { year, month, records, name, avatar } = options;
   const assets = await loadAssets();
   // 日历始终使用白天主题（按用户要求 🦌 / 🦌历 / 补🦌 不适配夜间模式）
   const theme = DAY_THEME;
@@ -237,7 +239,7 @@ export async function generateCalendarImage(
   </head>
   <body>
     <div class="canvas">
-      <img class="avatar" src="${escapeHtml(getAvatarUrl(userId))}" onerror="this.onerror=null;this.src='${assets.defaultAvatar}'" />
+      <img class="avatar" src="${escapeHtml(String(avatar ?? "").trim() || assets.defaultAvatar)}" onerror="this.onerror=null;this.src='${assets.defaultAvatar}'" />
       <div class="title">${year}-${String(month).padStart(2, "0")} 🦌签到日历</div>
       <div class="subtitle">@${escapeHtml(name)}</div>
       ${cellsHtml}
@@ -271,7 +273,7 @@ export async function generateRankImage(
     .map((row, idx) => {
       const y = headerHeight + idx * rowHeight;
       return `
-        <img class="rank-avatar" src="${escapeHtml(getAvatarUrl(row.userId))}" onerror="this.onerror=null;this.src='${assets.defaultAvatar}'" style="top:${y + 10}px" />
+        <img class="rank-avatar" src="${escapeHtml(String(row.avatar ?? "").trim() || assets.defaultAvatar)}" onerror="this.onerror=null;this.src='${assets.defaultAvatar}'" style="top:${y + 10}px" />
         <div class="rank-name" style="top:${y + 10}px">@${escapeHtml(row.name)}</div>
         <div class="rank-count" style="top:${y + 50}px">x${row.count}</div>
       `;

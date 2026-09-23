@@ -1,6 +1,6 @@
 export interface DeerUser {
   scene: string;
-  userId: number;
+  userId: string;
   canBeHelped: boolean;
   noDeerUntil: number | null;
 }
@@ -11,13 +11,13 @@ export interface DeerCheckInResult {
 }
 
 export interface DeerRankEntry {
-  userId: number;
+  userId: string;
   count: number;
 }
 
 export interface DeerScene {
   key: string;
   isGroup: boolean;
-  groupId?: number;
-  privateUserId?: number;
+  groupId?: string;
+  privateUserId?: string;
 }
