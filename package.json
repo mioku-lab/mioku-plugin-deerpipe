@@ -1,6 +1,6 @@
 {
   "name": "mioku-plugin-deerpipe",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "🦌管签到插件，支持自🦌、帮🦌、补🦌、🦌历、🦌榜",
   "main": "index.ts",
   "type": "module",
